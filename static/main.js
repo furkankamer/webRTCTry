@@ -173,6 +173,8 @@ var peerConn;
 var dataChannel;
 
 function signalingMessageCallback(message) {
+  if(typeof message !== 'object')
+    return;
   if (message.type === 'offer') {
     console.log('Got offer. Sending answer to peer.');
     peerConn.setRemoteDescription(new RTCSessionDescription(message), function() {},

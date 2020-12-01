@@ -199,6 +199,7 @@ function signalingMessageCallback(message) {
 
 let inboundStream = null;
 
+
 function createPeerConnection(isInitiator, config) {
   console.log('Creating Peer connection as initiator?', isInitiator, 'config:',
               config);
@@ -223,6 +224,8 @@ peerConn.onicecandidate = function(event) {
     console.log('End of candidates.');
   }
 };
+peerConn.onnegotiationneeded = () =>
+peerConn.createOffer().then(offer => peerConn.setLocalDescription(offer)).then(() => sendMessage(peerConn.localDescription));
 
 if (isInitiator) {
   stream.getTracks().forEach(track => peerConn.addTrack(track, stream));
@@ -235,9 +238,7 @@ if (isInitiator) {
   onDataChannelCreated(dataChannel);
 
   console.log('Creating an offer');
-  peerConn.createOffer().then(function(offer) {
-    return peerConn.setLocalDescription(offer);
-  })
+  peerConn.createOffer().then(offer => peerConn.setLocalDescription(offer))
   .then(() => {
     console.log('sending local desc:', peerConn.localDescription);
     sendMessage(peerConn.localDescription);

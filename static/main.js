@@ -7,7 +7,9 @@
 var configuration = {
   'iceServers': [{
   'urls': 'stun:stun.l.google.com:19302'
-   }]
+   }],
+   offerToReceiveAudio: true,
+   offerToReceiveVideo: true
 };
 
 //var configuration = null;
@@ -20,7 +22,7 @@ var trail = document.getElementById('trail');
 var snapBtn = document.getElementById('snap');
 var sendBtn = document.getElementById('send');
 var snapAndSendBtn = document.getElementById('snapAndSend');
-
+var videoElem = document.getElementById("videoElem");
 var photoContextW;
 var photoContextH;
 
@@ -149,7 +151,7 @@ function grabWebCamVideo() {
   })
   .then(gotStream)
   .catch(function(e) {
-    alert('getUserMedia() error: ' + e.name);
+    alert('getUserMedia() error: ' + e);
   });
 }
 
@@ -196,10 +198,17 @@ function signalingMessageCallback(message) {
   }
 }
 
+let inboundStream = null;
+
 function createPeerConnection(isInitiator, config) {
   console.log('Creating Peer connection as initiator?', isInitiator, 'config:',
               config);
   peerConn = new RTCPeerConnection(config);
+
+
+  
+  
+  
 
 // send any ice candidates to the other peer
 peerConn.onicecandidate = function(event) {
@@ -217,6 +226,7 @@ peerConn.onicecandidate = function(event) {
 };
 
 if (isInitiator) {
+  stream.getTracks().forEach(track => peerConn.addTrack(track, stream));
   console.log('Creating Data Channel');
   dataChannel = peerConn.createDataChannel('photos');
   onDataChannelCreated(dataChannel);
@@ -232,6 +242,7 @@ if (isInitiator) {
   .catch(logError);
 
 } else {
+  peerConn.ontrack = e => videoElem.srcObject = e.streams[0];
   peerConn.ondatachannel = function(event) {
     console.log('ondatachannel:', event.channel);
     dataChannel = event.channel;

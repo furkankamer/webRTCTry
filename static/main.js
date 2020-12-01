@@ -400,6 +400,7 @@ function snapAndSend() {
 }
 
 function renderPhoto(data) {
+  console.log(data);
   var canvas = document.getElementById("snapImg")
   canvas.width = photoContextW;
   canvas.height = photoContextH;
@@ -407,6 +408,7 @@ function renderPhoto(data) {
   // trail is the element holding the incoming images
 
   var context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
   var img = context.createImageData(photoContextW, photoContextH);
   img.data.set(data);
   context.putImageData(img, 0, 0);

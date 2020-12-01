@@ -4,6 +4,7 @@
 * Initial setup
 ****************************************************************************/
 
+grabWebCamVideo();
 var configuration = {
   'iceServers': [{
   'urls': 'stun:stun.l.google.com:19302'
@@ -56,16 +57,14 @@ socket.on('ipaddr', function(ipaddr) {
 });
 
 socket.on('created', function(data) {
-  console.log('Created room', data["room"], '- my client ID is', data["id"]);
   isInitiator = true;
-  grabWebCamVideo();
+  console.log('Created room', data["room"], '- my client ID is', data["id"]);
 });
 
 socket.on('joined', function(data) {
-  console.log('This peer has joined room', data["room"], 'with client ID', data["id"]);
   isInitiator = false;
+  console.log('This peer has joined room', data["room"], 'with client ID', data["id"]);
   createPeerConnection(isInitiator, configuration);
-  grabWebCamVideo();
 });
 
 socket.on('full', function(room) {
@@ -227,6 +226,10 @@ peerConn.onicecandidate = function(event) {
 
 if (isInitiator) {
   stream.getTracks().forEach(track => peerConn.addTrack(track, stream));
+  peerConn.ontrack = e => {
+    videoElem.srcObject = e.streams[0];
+    console.log("track received: joiner");
+  }
   console.log('Creating Data Channel');
   dataChannel = peerConn.createDataChannel('photos');
   onDataChannelCreated(dataChannel);
@@ -242,7 +245,11 @@ if (isInitiator) {
   .catch(logError);
 
 } else {
-  peerConn.ontrack = e => videoElem.srcObject = e.streams[0];
+  setTimeout(() => stream.getTracks().forEach(track => peerConn.addTrack(track, stream)),1000);
+  peerConn.ontrack = e => {
+    videoElem.srcObject = e.streams[0];
+    console.log("track received: joiner");
+  };
   peerConn.ondatachannel = function(event) {
     console.log('ondatachannel:', event.channel);
     dataChannel = event.channel;

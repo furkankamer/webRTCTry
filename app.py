@@ -22,9 +22,12 @@ app.secret_key = b'\xdd\xd6]j\xb0\xcc\xe3mNF{\x14\xaf\xa7\xb9\x18'
 
 @app.route('/')
 def index():
-    ni.ifaddresses('eth0')
-    ip = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
-    session["ip"] = ip   
+    try:
+        ni.ifaddresses('eth0')
+        ip = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
+        session["ip"] = ip
+    except:
+        session["ip"] = request.remote_addr   
     return render_template("index.html")
 
 @socketio.on('message')

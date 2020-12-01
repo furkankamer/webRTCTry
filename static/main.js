@@ -3,6 +3,7 @@
 /****************************************************************************
  * Initial setup
  ****************************************************************************/
+var index = 0;
 
 grabWebCamVideo();
 var configuration = {
@@ -90,8 +91,11 @@ function gotStream(stream) {
     };
     show(snapBtn);
     var peerConn;
+    var peerConnThird;
     var dataChannel;
-
+    function thirdPeer(){
+      createPeerConnectionThird(isInitiator,configuration);
+    }
     function signalingMessageCallback(message) {
         if (typeof message !== 'object')
             return;
@@ -115,6 +119,29 @@ function gotStream(stream) {
 
         }
     }
+    function signalingMessageCallbackThird(message) {
+        if (typeof message !== 'object')
+            return;
+        if (message.type === 'offer') {
+            console.log('Got offer. Sending answer to peer.');
+            peerConnThird.setRemoteDescription(new RTCSessionDescription(message), function() {},
+                logError);
+            peerConnThird.createAnswer(onLocalSessionCreatedThird, logError);
+
+        } else if (message.type === 'answer') {
+            console.log('Got answer.');
+            peerConnThird.setRemoteDescription(new RTCSessionDescription(message), function() {},
+                logError);
+
+        } else if (message.type === 'candidate') {
+            peerConnThird.addIceCandidate(new RTCIceCandidate({
+                candidate: message.candidate,
+                sdpMLineIndex: message.label,
+                sdpMid: message.id
+            }));
+
+        }
+    }
 
     var socket = io.connect();
 
@@ -129,9 +156,13 @@ function gotStream(stream) {
     });
 
     socket.on('joined', function(data) {
+        index = data["index"];
         isInitiator = false;
         console.log('This peer has joined room', data["room"], 'with client ID', data["id"]);
-        createPeerConnection(isInitiator, configuration);
+        if(index < 2)
+          createPeerConnection(isInitiator, configuration);
+        else
+          thirdPeer();
     });
 
     socket.on('full', function(room) {
@@ -142,7 +173,10 @@ function gotStream(stream) {
 
     socket.on('ready', function() {
         console.log('Socket is ready');
-        createPeerConnection(isInitiator, configuration);
+        if(index < 2)
+          createPeerConnection(isInitiator, configuration);
+        else
+          thirdPeer();
     });
 
     socket.on('log', function(array) {
@@ -151,7 +185,11 @@ function gotStream(stream) {
 
     socket.on('message', function(message) {
         console.log('Client received message:', typeof message);
-        signalingMessageCallback(message);
+        if(index < 2)
+          signalingMessageCallback(message);
+        else
+          signalingMessageCallbackThird(message);
+
     });
 
     // Joining a room.
@@ -190,6 +228,55 @@ function gotStream(stream) {
     function sendMessage(message) {
         console.log('Client sending message: ', message);
         socket.emit('message', message);
+    }
+    function createPeerConnectionThird(isInitiator, config) {
+        console.log('Creating Peer connection as initiator?', isInitiator, 'config:', config);
+        peerConnThird = new RTCPeerConnection(config);
+        peerConnThird.addEventListener('connectionstatechange', e => {
+            console.log(e.target.connectionState);
+        });
+
+        // send any ice candidates to the other peer
+        peerConnThird.onicecandidate = function(event) {
+            if (event.candidate) {
+                sendMessage({
+                    type: 'candidate',
+                    label: event.candidate.sdpMLineIndex,
+                    id: event.candidate.sdpMid,
+                    candidate: event.candidate.candidate
+                });
+            } else console.log('End of candidates.');
+        };
+
+
+
+        peerConnThird.onnegotiationneeded = () => peerConnThird.createOffer()
+            .then(offer => peerConnThird.setLocalDescription(offer))
+            .then(() => sendMessage(peerConnThird.localDescription));
+
+        if (isInitiator) {
+            stream.getTracks().forEach(track => peerConnThird.addTrack(track, stream));
+            peerConnThird.ontrack = e => videoElem2.srcObject = e.streams[0];
+            console.log('Creating Data Channel');
+            /*
+            dataChannel = peerConnThird.createDataChannel('photos');
+            onDataChannelCreated(dataChannel);
+            console.log('Creating an offer');
+            */
+            peerConnThird.createOffer().then(offer => peerConnThird.setLocalDescription(offer))
+                .then(() => sendMessage(peerConnThird.localDescription))
+                .catch(logError);
+
+        } else {
+            setTimeout(() => stream.getTracks().forEach(track => peerConnThird.addTrack(track, stream)), 1000);
+            peerConnThird.ontrack = e => videoElem2.srcObject = e.streams[0];
+            /*
+            peerConnThird.ondatachannel = e => {
+                dataChannel = e.channel;
+                onDataChannelCreated(dataChannel);
+            };
+            */
+        }
     }
 
     function createPeerConnection(isInitiator, config) {
@@ -236,6 +323,13 @@ function gotStream(stream) {
                 onDataChannelCreated(dataChannel);
             };
         }
+    }
+    function onLocalSessionCreatedThird(desc) {
+      console.log('local session created:', desc);
+      peerConnThird.setLocalDescription(desc).then(() => {
+          console.log('sending local desc:', peerConnThird.localDescription);
+          sendMessage(peerConnThird.localDescription);
+      }).catch(logError);
     }
 
     function onLocalSessionCreated(desc) {

@@ -43,10 +43,10 @@ def createOrJoin(room):
         rooms[room] = 1
         join_room(room)
         emit('created',{"room" :room, "id": session["id"]})
-    elif rooms[room] == 1:
+    elif rooms[room] <= 2:
         session["room"] = room
         join_room(room)
-        emit('joined',{"room" :room, "id": session["id"]})
+        emit('joined',{"room" :room, "id": session["id"], "index": rooms[room]})
         emit('ready',room, room = room)
         emit('ready',room, broadcast = True,include_self = False)
         rooms[room] += 1
